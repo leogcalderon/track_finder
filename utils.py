@@ -1,4 +1,5 @@
 from constant import *
+import time
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -57,7 +58,6 @@ def get_tracks(chart_link, wd):
 
     chart_lenght = len(tracks['title'])
 
-    #TODO
     for i in range(1, chart_lenght + 1, 1):
 
         link = (
@@ -70,15 +70,17 @@ def get_tracks(chart_link, wd):
 
         wd.get(link)
 
-        ul = wd.find_element_by_class_name('interior-track-content-list')
-        lis = ul.find_elements_by_tag_name('li')
+        lis = (
+            wd
+            .find_element_by_class_name('interior-track-content-list')
+            .find_elements_by_tag_name('li')
+        )
 
         for li in lis:
             k, v = li.find_elements_by_tag_name('span')
-            if k in tracks.keys():
-                tracks[k].append(v)
+            if k.text in tracks.keys():
+                tracks[k.text].append(v.text)
 
-        print(tracks)
         wd.get(chart_link)
 
     return tracks
@@ -105,30 +107,58 @@ def select_chart(genre_link, wd):
 
     return charts[chart]
 
-def save_tracks(chart_link, tracks_dict):
+def save_tracks(chart_link, tracks_dict, save=True):
     name = chart_link.split('/')[-2]
     df = pd.DataFrame(tracks_dict)
-    df.to_csv(f'{name}.csv', index=False)
-    print(f'CSV file save as {name}.csv')
+    if save:
+        df.to_csv(f'{name}.csv', index=False)
+        print(f'CSV file save as {name}.csv')
+    return df
 
-def chart_tracks_to_csv(path):
+def chart_tracks(path, save=True):
     wd = webdriver.Firefox(executable_path=path)
     genre_link = select_genre(wd)
     chart_link = select_chart(genre_link, wd)
     tracks = get_tracks(chart_link, wd)
-    save_tracks(chart_link, tracks)
+    wd.close()
+    return save_tracks(chart_link, tracks, save=save)
 
-def search_track(track, wd):
-    wd.get('http://soundcloud.com')
+def search_tracks(tracks):
 
+    profile = webdriver.FirefoxProfile()
+    profile.set_preference("browser.download.folderList", 2)
+    profile.set_preference("browser.download.manager.showWhenStarting", False)
+    profile.set_preference("browser.download.dir", 'PATH TO DESKTOP')
+    profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/x-gzip")
+    wd = webdriver.Firefox(firefox_profile=profile, executable_path=DRIVER_PATH)
 
-def search_tracks(chart_csv, wd):
     tracks.fillna('', inplace=True)
-    for _, track in tracks:
-        string = (
+
+    for _, track in tracks.iterrows():
+        search = (
             track.title + ' ' +
             track.artist + ' ' +
             track.remixers + ' ' +
-            track.labels
+            track.LABEL
         )
-        wd.get(f'http://soundcloud.com/search?q={string}')
+
+        wd.get(
+            f'http://soundcloud.com/search?q={search}'
+        )
+
+        track_link = wait_for_element_by_css_selector('.soundTitle__title', wd)
+
+        if track_link:
+            track_link = track_link.get_attribute('href')
+            wd.get('https://sctomp3.net')
+            box = wd.find_element_by_class_name('form-control')
+            box.send_keys(track_link)
+            box.send_keys(Keys.RETURN)
+
+            # IT GOES TOO FAST
+            # AND DOESN'T DOWNLOAD
+            download_button = wait_for_element_by_css_selector('.btn', wd)
+            time.sleep(5)
+
+            if download_button:
+                download_button.send_keys(Keys.RETURN)
