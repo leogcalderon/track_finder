@@ -128,7 +128,7 @@ def search_tracks(tracks):
     profile = webdriver.FirefoxProfile()
     profile.set_preference("browser.download.folderList", 2)
     profile.set_preference("browser.download.manager.showWhenStarting", False)
-    profile.set_preference("browser.download.dir", 'PATH TO DESKTOP')
+    profile.set_preference("browser.download.dir", DOWNLOAD_DIR)
     profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/x-gzip")
     wd = webdriver.Firefox(firefox_profile=profile, executable_path=DRIVER_PATH)
 
@@ -155,10 +155,8 @@ def search_tracks(tracks):
             box.send_keys(track_link)
             box.send_keys(Keys.RETURN)
 
-            # IT GOES TOO FAST
-            # AND DOESN'T DOWNLOAD
-            download_button = wait_for_element_by_css_selector('.btn', wd)
             time.sleep(5)
-
-            if download_button:
-                download_button.send_keys(Keys.RETURN)
+            download_button = wd.find_element_by_class_name('card-body').find_element_by_tag_name('a')
+            download_button.send_keys(Keys.RETURN)
+            time.sleep(10)
+            wd.close()
