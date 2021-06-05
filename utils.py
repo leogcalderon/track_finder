@@ -1,5 +1,3 @@
-from constant import *
-import time
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -15,35 +13,70 @@ def wait_for_element_by_css_selector(css_selector, wd):
         return None
 
 def get_genres(wd):
-  wd.get("https://www.beatport.com")
-  return {
-      genre.get_attribute('data-name') : genre.get_attribute('href')
-      for genre in wd.find_elements_by_class_name('genre-drop-list__genre')
-  }
+    """
+    Gets a dictionary with the genres and their links
+    Parameters:
+    ----------
+    wd : selenium.webdriver
+
+    Returns:
+    ---------
+    dict
+    """
+    wd.get("https://www.beatport.com")
+    return {
+        genre.get_attribute('data-name') : genre.get_attribute('href')
+        for genre in wd.find_elements_by_class_name('genre-drop-list__genre')
+    }
 
 def get_genre_charts(genre_link, wd):
-  wd.get(genre_link)
+    """
+    Gets a dictionary with the charts and their links
+    Parameters:
+    ----------
+    genre_link : str
 
-  charts = {
-      str(name.text + ' - ' + artist.text) : link.get_attribute('href')
-      for name, artist, link in zip(
-          wd.find_elements_by_class_name('chart-title'),
-          wd.find_elements_by_class_name('chart-artists'),
-          wd.find_elements_by_class_name('chart-url')
-      )
-  }
+    wd : selenium.webdriver
 
-  tops = {
-    top_chart.text: top_chart.get_attribute('href')
-    for top_chart in wd.find_elements_by_class_name('view-top-hundred-tracks')
-  }
+    Returns:
+    ---------
+    dict
+    """
+    wd.get(genre_link)
+    charts = {
+        str(name.text + ' - ' + artist.text) : link.get_attribute('href')
+        for name, artist, link in zip(
+            wd.find_elements_by_class_name('chart-title'),
+            wd.find_elements_by_class_name('chart-artists'),
+            wd.find_elements_by_class_name('chart-url')
+        )
+    }
 
-  return {
-    **charts,
-    **tops
-  }
+    tops = {
+        top_chart.text: top_chart.get_attribute('href')
+        for top_chart in wd.find_elements_by_class_name('view-top-hundred-tracks')
+    }
+
+    return {
+        **charts,
+        **tops
+    }
 
 def get_tracks(chart_link, wd):
+    """
+    Gets a dictionary containing all metadata for
+    each track for the given chart
+
+    Parameters:
+    ----------
+    chart_link : str
+
+    wd : selenium.webdriver
+
+    Returns:
+    ---------
+    dict
+    """
     wd.get(chart_link)
     tracks = {
         'title': [title.text for title in wd.find_elements_by_class_name('buk-track-title')][1:],
@@ -58,7 +91,7 @@ def get_tracks(chart_link, wd):
 
     chart_lenght = len(tracks['title'])
 
-    for i in range(1, chart_lenght + 1, 1):
+    for i in range(1, chart_lenght + 1):
 
         link = (
             wait_for_element_by_css_selector(
@@ -86,28 +119,65 @@ def get_tracks(chart_link, wd):
     return tracks
 
 def select_genre(wd):
+    """
+    Returns the selected genre link
+
+    Parameters:
+    ----------
+    wd : selenium.webdriver
+
+    Returns:
+    ---------
+    str
+    """
     genres = get_genres(wd)
     print('Enter the number of the desired genre and press enter.\n')
+
     for i, g in enumerate(genres.keys()):
         print(f'{i} - {g}')
 
     n = int(input())
-    genre = list(genres.keys())[n]
-
-    return genres[genre]
+    return genres[list(genres.keys())[n]]
 
 def select_chart(genre_link, wd):
+    """
+    Returns the selected chart link
+
+    Parameters:
+    ----------
+    wd : selenium.webdriver
+
+    Returns:
+    ---------
+    str
+    """
     charts = get_genre_charts(genre_link, wd)
     print('Enter the number of the desired chart and press enter.\n')
+
     for i, c in enumerate(charts.keys()):
         print(f'{i} - {c}')
 
     n = int(input())
-    chart = list(charts.keys())[n]
-
-    return charts[chart]
+    return charts[list(charts.keys())[n]]
 
 def save_tracks(chart_link, tracks_dict, save=True):
+    """
+    Creates and saves a dataframe with the chart metadata
+
+    Parameters:
+    ----------
+    chart_link : str
+
+    tracks_dict : dict
+        Dictionary returned by get_tracks method
+
+    save : bool
+        If true it will save the dataframe into a csv file
+
+    Returns:
+    --------
+    pd.DataFrame
+    """
     name = chart_link.split('/')[-2]
     df = pd.DataFrame(tracks_dict)
     if save:
@@ -116,47 +186,21 @@ def save_tracks(chart_link, tracks_dict, save=True):
     return df
 
 def chart_tracks(path, save=True):
+    """
+    Allows user to search a chart from beatport
+    and save the chart metadata
+
+    Parameters:
+    -----------
+    path : str
+        executable path for the webdriver
+
+    save : bool
+        If true it will save the dataframe into a csv file
+    """
     wd = webdriver.Firefox(executable_path=path)
     genre_link = select_genre(wd)
     chart_link = select_chart(genre_link, wd)
     tracks = get_tracks(chart_link, wd)
     wd.close()
     return save_tracks(chart_link, tracks, save=save)
-
-def search_tracks(tracks):
-
-    profile = webdriver.FirefoxProfile()
-    profile.set_preference("browser.download.folderList", 2)
-    profile.set_preference("browser.download.manager.showWhenStarting", False)
-    profile.set_preference("browser.download.dir", DOWNLOAD_DIR)
-    profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/x-gzip")
-    wd = webdriver.Firefox(firefox_profile=profile, executable_path=DRIVER_PATH)
-
-    tracks.fillna('', inplace=True)
-
-    for _, track in tracks.iterrows():
-        search = (
-            track.title + ' ' +
-            track.artist + ' ' +
-            track.remixers + ' ' +
-            track.LABEL
-        )
-
-        wd.get(
-            f'http://soundcloud.com/search?q={search}'
-        )
-
-        track_link = wait_for_element_by_css_selector('.soundTitle__title', wd)
-
-        if track_link:
-            track_link = track_link.get_attribute('href')
-            wd.get('https://sctomp3.net')
-            box = wd.find_element_by_class_name('form-control')
-            box.send_keys(track_link)
-            box.send_keys(Keys.RETURN)
-
-            time.sleep(5)
-            download_button = wd.find_element_by_class_name('card-body').find_element_by_tag_name('a')
-            download_button.send_keys(Keys.RETURN)
-            time.sleep(10)
-            wd.close()
