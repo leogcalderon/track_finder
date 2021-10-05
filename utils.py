@@ -1,4 +1,7 @@
 import pandas as pd
+import numpy as np
+from tqdm import tqdm
+from subprocess import Popen, PIPE, call
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
@@ -204,3 +207,24 @@ def chart_tracks(path, save=True):
     tracks = get_tracks(chart_link, wd)
     wd.close()
     return save_tracks(chart_link, tracks, save=save)
+
+def download_track(track_name, destination, quality):
+    process = Popen(
+        ['soulseek', 'download' ,f'{track_name}', '-d', f'{destination}'],
+        stdout=PIPE,
+        stdin=PIPE
+    )
+    process.stdin.write(bytes('1\n', 'utf-8'))
+    print(str(process.communicate()[0]))
+
+def download_tracks(csv_file, destination, quality=320):
+    df = (
+        pd.read_csv(csv_file)
+        [['title', 'artist', 'remixers']]
+        .replace([np.nan], [''])
+        .replace([','], [''])
+        .agg(' '.join, axis=1)
+    )
+
+    for track_name in tqdm(list(df)):
+        download_track(track_name, destination, quality)
