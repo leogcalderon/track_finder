@@ -1,4 +1,4 @@
-Utilities to automate tracks downloading process faster.
+Utilities to automate track downloading process.
 
 # Beatport parser
 
