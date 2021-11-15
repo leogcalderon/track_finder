@@ -1,4 +1,9 @@
+import re
+import string
+import logging
 import pandas as pd
+import numpy as np
+from tqdm import tqdm
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
@@ -6,11 +11,34 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 
+logging.basicConfig(level='INFO')
+
 def wait_for_element_by_css_selector(css_selector, wd):
     try:
         return WebDriverWait(wd, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, css_selector)))
     except TimeoutException:
         return None
+
+def clean_title(track_name):
+    """
+    Cleans the track title.
+    Removes labels between [] and punctuations.
+
+    Parameters:
+    -----------
+    track_name : str
+
+    Returns:
+    --------
+    str
+    """
+    return (
+        re.sub('[\[].*?[\]]', '', track_name)
+        .lower()
+        .replace('premiere', '')
+        .replace('original', '')
+        .translate(str.maketrans('', '', string.punctuation))
+    )
 
 def get_genres(wd):
     """
@@ -160,7 +188,7 @@ def select_chart(genre_link, wd):
     n = int(input())
     return charts[list(charts.keys())[n]]
 
-def save_tracks(chart_link, tracks_dict, save=True):
+def save_tracks(chart_link, tracks_dict, save=True, format=True):
     """
     Creates and saves a dataframe with the chart metadata
 
@@ -180,9 +208,17 @@ def save_tracks(chart_link, tracks_dict, save=True):
     """
     name = chart_link.split('/')[-2]
     df = pd.DataFrame(tracks_dict)
+    if format:
+        df['duration'] = df['LENGTH']
+        df['track_name'] = (
+            df[['title', 'artist' ,'remixers']]
+            .fillna('')
+            .agg(lambda x: ' '.join(x), axis=1)
+            .apply(clean_title)
+        )
     if save:
         df.to_csv(f'{name}.csv', index=False)
-        print(f'CSV file save as {name}.csv')
+        logging.info(f'CSV file save as {name}.csv')
     return df
 
 def chart_tracks(path, save=True):

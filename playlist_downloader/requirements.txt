@@ -1,2 +1,4 @@
+spotipy==2.19.0
+click==7.1.2
 pandas==1.2.0
 selenium==3.141.0
