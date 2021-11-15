@@ -2,7 +2,7 @@ Utilities to automate track downloading process.
 
 # Beatport parser
 
-Saves a csv file with all track features available in beatport of a chart.
+Saves a Beatport chart into a csv file.
 
 ## Usage
 1. Install requirements
