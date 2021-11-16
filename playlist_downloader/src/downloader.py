@@ -2,9 +2,13 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from datetime import datetime
+from urllib.request import urlretrieve
 import difflib
 import logging
 import pandas as pd
+from tqdm import tqdm
+import src.config
+import os
 
 logging.basicConfig(level='INFO')
 DRIVER_PATH = '/usr/local/bin/geckodriver'
@@ -75,7 +79,7 @@ def analize_results(results, track_duration, search):
         )
     ]
 
-def download_best_match(results_list):
+def download_best_match(results_list, path='downloads'):
     """
     Compares all results and downloads the best match. To get the best match
     this function select the result with the closest duration and higher
@@ -86,6 +90,9 @@ def download_best_match(results_list):
     results_list : list
         Containing all dictionaries for all the results
     """
+    if not os.path.exists(path):
+        os.makedirs(path)
+
     best_match = (
         sorted(
             results_list,
@@ -94,7 +101,7 @@ def download_best_match(results_list):
     )
     if best_match['name'] != 'undefined':
         logging.info(f'[download_best_match] Downloading {best_match["name"]}')
-        best_match['link'].send_keys(Keys.RETURN)
+        urlretrieve(best_match['link'].get_attribute('href'), f'{path}/{best_match["name"]}.mp3')
 
 def download_track(search, duration, driver_path=DRIVER_PATH):
     """
@@ -125,5 +132,5 @@ def download_tracks(df):
         Track names must be in 'track_name' column and duration in the format
         MM:SS in the 'duration' column.
     """
-    for search, duration in zip(df['track_name'], df['duration']):
+    for search, duration in tqdm(zip(df['track_name'], df['duration'])):
         download_track(search, duration)
